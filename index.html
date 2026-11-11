@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>WordWave – type the most common English words</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌊</text></svg>">
+<title>Common Words – type the most common English words</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⌨️</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -39,6 +39,7 @@ small{color:var(--mut)}
 .live .off{visibility:hidden}
 /* typing area */
 .area{position:relative;background:var(--card);border:1px solid var(--line);border-radius:26px;padding:14px 24px;cursor:text}
+.area.static{cursor:default}
 .clip{height:8.1rem;overflow:hidden;transition:filter .25s,opacity .25s}
 .words{position:relative;display:flex;flex-wrap:wrap;column-gap:1.3ch;font:500 clamp(1.2rem,3.6vw,1.75rem)/2.7rem 'JetBrains Mono',ui-monospace,monospace;transition:transform .18s}
 .w{flex:none;height:2.7rem;white-space:pre;border-bottom:2px solid transparent}
@@ -67,8 +68,12 @@ kbd{font:inherit;font-size:.82rem;border:1px solid var(--line);border-radius:7px
 .facts b{display:block;font-size:1.6rem;font-weight:600}
 .q{color:var(--mut)}
 .chips,.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.chip{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:6px 14px;font:500 .95rem 'JetBrains Mono',monospace}
-.chip:hover{border-color:var(--cy)}
+.chip{background:rgba(255,79,147,.14);border:1px solid rgba(255,79,147,.5);border-radius:99px;padding:6px 14px;font:500 .95rem 'JetBrains Mono',monospace}
+.ghostbtn{background:var(--card);border:1px solid var(--line);border-radius:99px;padding:11px 20px;font-weight:500;transition:.15s}
+.ghostbtn:hover{border-color:var(--cy)}
+.mw{display:inline-flex;align-items:center;gap:9px;border-radius:99px;padding:5px 6px 5px 14px;font:500 .95rem 'JetBrains Mono',monospace;border:1px solid rgba(255,79,147,calc(.25 + var(--h)*.6));background:rgba(255,79,147,calc(.08 + var(--h)*.24))}
+.mw i{font:600 .85rem Fredoka,sans-serif;font-style:normal;background:var(--pink);color:#2a0014;border-radius:99px;min-width:26px;text-align:center;padding:1px 8px}
+.linkbtn{background:none;border:0;color:var(--mut);text-decoration:underline;font-size:.9rem}
 .btn{border:0;background:linear-gradient(135deg,var(--vio),var(--pink));border-radius:99px;font-weight:600;padding:12px 26px;font-size:1.05rem;box-shadow:0 8px 24px #ff4f9340;transition:.15s}
 .btn:hover{transform:translateY(-2px)}
 /* word sets */
@@ -91,7 +96,7 @@ button.set:hover{transform:translateY(-3px);border-color:var(--cy)}
 <body>
 <div class="app">
   <header>
-    <button class="logo" id="logo" aria-label="Restart"><span>WordWave</span> 🌊</button>
+    <button class="logo" id="logo" aria-label="Restart"><span>Common Words</span> ⌨️</button>
     <div class="pills" id="pills"></div>
   </header>
 
@@ -101,11 +106,12 @@ button.set:hover{transform:translateY(-3px);border-color:var(--cy)}
       <button class="tog" data-k="timer" aria-pressed="true">Timer</button>
       <button class="tog" data-k="wpm" aria-pressed="true">WPM</button>
       <button class="tog" data-k="prog" aria-pressed="true">Typed / left</button>
-      <button class="icon" id="rs" title="Restart (Tab)" aria-label="Restart test">↻</button>
+      <button class="icon" id="rs" title="Restart (Enter)" aria-label="Restart test">↻</button>
     </div>
   </div>
 
   <main id="test"></main>
+  <section id="practice"></section>
   <section id="sets"></section>
 </div>
 
@@ -126,16 +132,15 @@ const SETS = [
 
 /* ---------- helpers & saved settings ---------- */
 const $ = s => document.querySelector(s);
-let store = {best:{}, tests:0, opts:{timer:true, wpm:true, prog:true}};
-try { const s = JSON.parse(localStorage.getItem('wordwave-typing') || '{}'); Object.assign(store, s); store.opts = Object.assign({timer:true, wpm:true, prog:true}, s.opts); } catch(e) {}
-const save = () => { try { localStorage.setItem('wordwave-typing', JSON.stringify(store)); } catch(e) {} };
+let store = {best:{}, missed:{}, tests:0, opts:{timer:true, wpm:true, prog:true}};
+try { const s = JSON.parse(localStorage.getItem('common-words') || localStorage.getItem('wordwave-typing') || '{}'); Object.assign(store, s); store.opts = Object.assign({timer:true, wpm:true, prog:true}, s.opts); } catch(e) {}
+const save = () => { try { localStorage.setItem('common-words', JSON.stringify(store)); } catch(e) {} };
 const shuffle = a => { a = a.slice(); for (let i = a.length-1; i > 0; i--) { const j = Math.floor(Math.random()*(i+1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const fmt = s => Math.floor(s/60) + ':' + String(Math.floor(s%60)).padStart(2,'0');
-function say(w){ try { speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(w); u.lang = 'en-US'; u.rate = .85; speechSynthesis.speak(u); } catch(e) {} }
 const pills = () => $('#pills').innerHTML = `<span class="pill">🏆 Best ${store.best[setN] || 0} wpm</span><span class="pill">⌨️ ${store.tests} tests</span>`;
 
 /* ---------- test state ---------- */
-let setN = 100, T = [], els = [], cur = 0, typed = '', prevLen = 0;
+let setN = 100, mode = 'set', lastRes = null, tEnd = 0, T = [], els = [], cur = 0, typed = '', prevLen = 0;
 let started = false, finished = false, t0 = 0, tick = 0, caretT = 0;
 let cc = 0, rawc = 0, ck = 0, wk = 0, missed = [];
 let words, caret, area, inp;
@@ -148,14 +153,16 @@ function applyOpts(){
 function newTest(){
   clearInterval(tick);
   const set = SETS.find(s => s.n === setN);
-  T = shuffle(set.words); cur = 0; typed = ''; prevLen = 0; started = finished = false;
+  T = mode === 'practice' ? practiceList() : shuffle(set.words);
+  if (!T.length) { mode = 'set'; T = shuffle(set.words); }
+  cur = 0; typed = ''; prevLen = 0; started = finished = false;
   cc = rawc = ck = wk = 0; missed = [];
-  $('#setname').textContent = `Top ${setN} words`; pills();
+  $('#setname').textContent = mode === 'practice' ? 'Practice: missed words' : `Top ${setN} words`; pills();
   $('#test').innerHTML = `
     <div class="live"><div class="s-timer"><b id="vT">0:00</b></div><div class="s-wpm"><b id="vW">0</b><small>wpm</small></div><div class="s-prog"><b id="vP">0</b><small>typed</small> &nbsp; <b id="vR">${T.length}</b><small>left</small></div></div>
     <div class="area blur" id="area"><div class="clip"><div class="words" id="words"><i class="caret" id="caret"></i>${T.map(w => `<span class="w">${[...w].map(c => `<span class="l">${c}</span>`).join('')}</span>`).join('')}</div></div><div class="hint">Click here or start typing</div></div>
     <div class="meter"><i id="bar"></i></div>
-    <p class="tip"><kbd>Tab</kbd> restart &nbsp; <kbd>Space</kbd> next word</p>
+    <p class="tip"><kbd>Enter</kbd> restart &nbsp; <kbd>Space</kbd> next word</p>
     <input class="ghostinp" id="inp" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" aria-label="Type the words shown">`;
   words = $('#words'); caret = $('#caret'); area = $('#area'); inp = $('#inp');
   els = [...words.querySelectorAll('.w')]; els[0].classList.add('now');
@@ -231,45 +238,137 @@ function commit(t, auto){
 }
 
 function finish(){
-  finished = true; clearInterval(tick);
-  const s = Math.max(.5, (performance.now() - t0)/1000), m = s/60;
+  finished = true; tEnd = performance.now(); clearInterval(tick);
+  const s = Math.max(.5, (tEnd - t0)/1000), m = s/60;
   const wpm = Math.round(cc/5/m), raw = Math.round(rawc/5/m), acc = Math.round(ck/Math.max(1, ck+wk)*100);
-  const rec = wpm > (store.best[setN] || 0); if (rec) store.best[setN] = wpm;
-  store.tests++; save(); pills();
-  $('#test').innerHTML = `<div class="area"><div class="res">
+  const rec = mode === 'set' && wpm > (store.best[setN] || 0); if (rec) store.best[setN] = wpm;
+  const mc = {}; missed.forEach(w => mc[w] = (mc[w] || 0) + 1);
+  const mu = Object.entries(mc).sort((a,b) => b[1]-a[1]);
+  missed.forEach(w => store.missed[w] = (store.missed[w] || 0) + 1);   // only counted because the test was finished
+  store.tests++; save(); pills(); renderPractice();
+  lastRes = {wpm, acc, raw, s, n:T.length, miss:missed.length, mu, rec, label:$('#setname').textContent};
+  $('#test').innerHTML = `<div class="area static"><div class="res">
     <div class="heroes"><div class="hero"><small>wpm</small><b>${wpm}</b>${rec ? '<em>New best!</em>' : ''}</div><div class="hero"><small>accuracy</small><b>${acc}%</b></div></div>
-    <div class="facts"><span><small>raw speed</small><b>${raw}</b></span><span><small>time</small><b>${fmt(s)}</b></span><span><small>words</small><b>${T.length}</b></span><span><small>missed words</small><b>${missed.length}</b></span></div>
-    ${missed.length ? `<div><p class="q" style="margin-bottom:8px">Words to practice (tap to hear them)</p><div class="chips">${missed.map(w => `<button class="chip" data-say="${w}">🔊 ${w}</button>`).join('')}</div></div>` : '<p class="q">Every word was right. Flawless!</p>'}
-    <div class="row"><button class="btn" id="again">Next test</button><small>or press <kbd>Enter</kbd></small></div>
+    <div class="facts"><span><small>raw speed</small><b>${raw}</b></span><span><small>time</small><b>${fmt(s)}</b></span><span><small>words</small><b>${T.length}</b></span><span><small>words missed</small><b>${missed.length}</b></span></div>
+    ${mu.length ? `<div><p class="q" style="margin-bottom:8px">Words missed</p><div class="chips">${mu.map(([w,n]) => `<span class="chip">${w}${n > 1 ? ` ×${n}` : ''}</span>`).join('')}</div></div>` : '<p class="q">Every word was right. Flawless!</p>'}
+    <div class="row"><button class="btn" id="again">Next test</button><button class="ghostbtn" id="shot">📸 Screenshot</button><small>Click copies, Shift+click downloads</small></div>
   </div></div>`;
   $('#again').onclick = newTest;
-  $('#test').querySelectorAll('[data-say]').forEach(b => b.onclick = () => say(b.dataset.say));
+  $('#shot').onclick = e => shotClick(e, e.currentTarget);
+}
+
+/* ---------- screenshot of the results rectangle ---------- */
+async function makeShot(){
+  try { await Promise.all([document.fonts.load('700 40px Fredoka'), document.fonts.load('500 22px "JetBrains Mono"')]); } catch(e) {}
+  const r = lastRes, S = 2, W = 1000, P = 56, MONO = '500 22px "JetBrains Mono", monospace';
+  const F = (w, z) => `${w} ${z}px Fredoka, system-ui, sans-serif`;
+  const rr = (c, x, y, w, h, q) => c.roundRect ? c.roundRect(x, y, w, h, q) : c.rect(x, y, w, h);
+  const mx = document.createElement('canvas').getContext('2d'); mx.font = MONO;
+  let cx = P, rows = 1;
+  const chips = r.mu.map(([w, n]) => {
+    const t = n > 1 ? `${w} ×${n}` : w, cw = mx.measureText(t).width + 32;
+    if (cx + cw > W - P && cx > P) { cx = P; rows++; }
+    const o = {t, cw, x:cx, row:rows-1}; cx += cw + 10; return o;
+  });
+  const H = (chips.length ? 440 + rows*50 - 10 : 448) + 56;
+  const cv = document.createElement('canvas'); cv.width = W*S; cv.height = H*S;
+  const c = cv.getContext('2d'); c.scale(S, S);
+  c.fillStyle = '#120c2b'; c.fillRect(0, 0, W, H);
+  [[100,0,'74,34,184',.5,560],[W,80,'255,79,147',.28,480]].forEach(([gx,gy,col,a,rad]) => {
+    const g = c.createRadialGradient(gx,gy,0,gx,gy,rad); g.addColorStop(0,`rgba(${col},${a})`); g.addColorStop(1,`rgba(${col},0)`); c.fillStyle = g; c.fillRect(0,0,W,H);
+  });
+  c.beginPath(); rr(c, 20, 20, W-40, H-40, 28); c.fillStyle = 'rgba(255,255,255,.06)'; c.fill(); c.strokeStyle = 'rgba(255,255,255,.16)'; c.lineWidth = 1.5; c.stroke();
+  const txt = (t, x, y, font, col, al) => { c.font = font; c.fillStyle = col; c.textAlign = al || 'left'; c.fillText(t, x, y); };
+  const big = (t, x, y) => {
+    c.font = F(700,112); const g = c.createLinearGradient(x, y-110, x + c.measureText(t).width, y);
+    g.addColorStop(0,'#ffc23d'); g.addColorStop(1,'#ff4f93'); txt(t, x, y, F(700,112), g); return c.measureText(t).width;
+  };
+  txt('Common Words', P, 88, F(700,34), '#f7f5ff');
+  txt(r.label, W-P, 86, F(500,22), '#b2acd4', 'right');
+  txt('wpm', P, 152, F(500,24), '#b2acd4');
+  const ww = big(String(r.wpm), P, 252), x2 = P + ww + 90;
+  txt('accuracy', x2, 152, F(500,24), '#b2acd4'); big(r.acc + '%', x2, 252);
+  if (r.rec) txt('New best!', W-P, 250, F(600,30), '#b4f04a', 'right');
+  [['raw speed', r.raw], ['time', fmt(r.s)], ['words', r.n], ['words missed', r.miss]].forEach(([l, v], i) => {
+    const x = P + i*(W-2*P)/4; txt(l, x, 322, F(500,20), '#b2acd4'); txt(String(v), x, 364, F(600,34), '#f7f5ff');
+  });
+  if (chips.length) {
+    txt('Practice these', P, 424, F(500,22), '#b2acd4');
+    chips.forEach(o => {
+      const y = 440 + o.row*50; c.beginPath(); rr(c, o.x, y, o.cw, 40, 20);
+      c.fillStyle = 'rgba(255,79,147,.16)'; c.fill(); c.strokeStyle = 'rgba(255,79,147,.6)'; c.lineWidth = 1.5; c.stroke();
+      txt(o.t, o.x+16, y+27, MONO, '#f7f5ff');
+    });
+  } else txt('Every word was right. Flawless!', P, 430, F(500,22), '#b4f04a');
+  return new Promise(res => cv.toBlob(res, 'image/png'));
+}
+async function shotClick(e, btn){
+  const label = btn.textContent; let msg;
+  const download = blob => { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'common-words-result.png'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000); };
+  btn.blur();
+  try {
+    if (e.shiftKey) { download(await makeShot()); msg = 'Downloaded!'; }
+    else { await navigator.clipboard.write([new ClipboardItem({'image/png': makeShot()})]); msg = 'Copied!'; }
+  } catch(err) {
+    try { download(await makeShot()); msg = "Couldn't copy, downloaded"; } catch(e2) { msg = 'Something went wrong'; }
+  }
+  btn.textContent = msg; setTimeout(() => { btn.textContent = label; }, 2000);
+}
+
+/* ---------- practice: missed words, most missed shown (and drilled) most ---------- */
+function practiceList(){
+  const e = Object.entries(store.missed).filter(([,c]) => c > 0);
+  if (!e.length) return [];
+  const N = Math.min(60, Math.max(10, e.reduce((a,[,c]) => a + Math.min(c,5), 0)));
+  const top = shuffle(e).sort((a,b) => b[1]-a[1]).slice(0, N), tot = top.reduce((a,[,c]) => a + c, 0);
+  let list = [];
+  top.forEach(([w,c]) => { for (let i = 0; i < Math.max(1, Math.round(N*c/tot)); i++) list.push(w); });
+  list = shuffle(list);
+  for (let i = 1; i < list.length; i++) if (list[i] === list[i-1]) { const j = list.findIndex((x,k) => k > i && x !== list[i]); if (j > 0) [list[i], list[j]] = [list[j], list[i]]; }
+  return list;
+}
+function renderPractice(){
+  const e = Object.entries(store.missed).filter(([,c]) => c > 0).sort((a,b) => b[1]-a[1] || a[0].localeCompare(b[0]));
+  const max = e.length ? e[0][1] : 1;
+  $('#practice').innerHTML = `<h2>Practice <span class="tag">${e.length} ${e.length === 1 ? 'word' : 'words'}</span></h2>` + (e.length ? `
+    <div class="chips">${e.map(([w,c]) => `<span class="mw" style="--h:${c/max}" title="Missed ${c} ${c === 1 ? 'time' : 'times'}">${w}<i>${c}</i></span>`).join('')}</div>
+    <div class="row" style="margin-top:16px"><button class="btn" id="prac">Practice missed words</button><button class="linkbtn" id="clr">Clear list</button><small>The more you miss a word, the more it shows up.</small></div>`
+    : '<p class="q">No missed words yet. Finish a test and the words you get wrong will collect here.</p>');
 }
 
 /* ---------- word sets (locked ones are not clickable) ---------- */
 function renderSets(){
   const ready = SETS.filter(s => s.words.length), wip = SETS.filter(s => !s.words.length);
   $('#sets').innerHTML = `<h2>Word sets</h2>
-    <div class="sets">${ready.map(s => `<button class="set ${s.n === setN ? 'on' : ''}" data-n="${s.n}"><b>${s.n}</b><span>most common words</span><em>${s.n === setN ? 'Selected' : 'Practice this set'}</em></button>`).join('')}</div>
+    <div class="sets">${ready.map(s => { const on = mode === 'set' && s.n === setN; return `<button class="set ${on ? 'on' : ''}" data-n="${s.n}"><b>${s.n}</b><span>most common words</span><em>${on ? 'Selected' : 'Practice this set'}</em></button>`; }).join('')}</div>
     ${wip.length ? `<h2>Work in progress <span class="tag">coming soon</span></h2>
     <div class="sets">${wip.map(s => `<div class="set locked" aria-disabled="true"><b>${s.n}</b><span>most common words</span><em>🔒 Not ready yet</em></div>`).join('')}</div>` : ''}`;
 }
 
 /* ---------- events ---------- */
 document.querySelectorAll('.tog').forEach(b => b.onclick = () => {
-  store.opts[b.dataset.k] = !store.opts[b.dataset.k]; save(); applyOpts(); if (inp && !finished) inp.focus();
+  store.opts[b.dataset.k] = !store.opts[b.dataset.k]; save(); applyOpts();
+  if (finished) b.blur(); else if (inp) inp.focus();
 });
 $('#rs').onclick = $('#logo').onclick = newTest;
 $('#sets').onclick = e => {
   const b = e.target.closest('[data-n]'); if (!b) return;
-  setN = +b.dataset.n; renderSets(); newTest(); window.scrollTo({top:0, behavior:'smooth'});
+  setN = +b.dataset.n; mode = 'set'; renderSets(); newTest(); window.scrollTo({top:0, behavior:'smooth'});
+};
+$('#practice').onclick = e => {
+  if (e.target.closest('#prac')) { mode = 'practice'; renderSets(); newTest(); window.scrollTo({top:0, behavior:'smooth'}); }
+  else if (e.target.closest('#clr') && confirm('Clear your missed words list?')) {
+    store.missed = {}; save(); if (mode === 'practice') mode = 'set'; renderPractice(); renderSets(); newTest();
+  }
 };
 document.addEventListener('keydown', e => {
-  if (finished && e.key === 'Enter') { e.preventDefault(); newTest(); }
-  else if (!finished && (e.key === 'Escape' || (e.key === 'Tab' && !e.shiftKey && document.activeElement === inp))) { e.preventDefault(); newTest(); }
+  if (e.key !== 'Enter' || e.repeat) return;
+  if (document.activeElement && document.activeElement.tagName === 'BUTTON') return;   // let focused buttons work normally
+  if (finished && performance.now() - tEnd < 500) return;                                 // don't skip the results by accident
+  e.preventDefault(); newTest();
 });
 window.addEventListener('resize', place);
-renderSets(); newTest();
+renderSets(); renderPractice(); newTest();
 </script>
 </body>
 </html>
